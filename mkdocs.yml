@@ -34,6 +34,8 @@ nav:
   - Guidelines: 
       - Environment Service: guidelines/env_service.md
       - Task Manager: guidelines/task_manager.md
+      - Self-Questioning Migration: guidelines/self_questioning_migration.md
+      - NL2SQL Example: guidelines/nl2sql_example.md
       # - Context Manager: guidelines/context_manager.md
       - Experience Manager: guidelines/exp_manager.md
       - Advantage Processor: guidelines/adv_processor.md

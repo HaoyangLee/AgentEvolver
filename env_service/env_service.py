@@ -140,7 +140,20 @@ class EnvService:
         )
 
         if not ray.is_initialized():
-            ray.init(address='local')
+            # Ray's first local startup can take tens of seconds; there is no further
+            # progress unless Uvicorn logs are visible (see __main__ block).
+            print(
+                "[env_service] Initializing local Ray (first run may take 30–60s)...",
+                flush=True,
+            )
+            ray_kw: Dict[str, Any] = {"address": "local", "ignore_reinit_error": True}
+            # Set ENV_SERVICE_RAY_DASHBOARD=0 if startup hangs after the Ray banner
+            # (dashboard binds extra ports, e.g. 8265).
+            _dash = os.environ.get("ENV_SERVICE_RAY_DASHBOARD", "").strip().lower()
+            if _dash in ("0", "false", "no", "off"):
+                ray_kw["include_dashboard"] = False
+            ray.init(**ray_kw)
+            print("[env_service] Ray initialized.", flush=True)
         self.env_actors = {}
         self.remote_env = {}
         self.last_access_time = {}
@@ -257,7 +270,7 @@ class EnvService:
         """
 
         env_cls = Registry.get(env_type)
-        return env_cls.get_query_list(split)
+        return env_cls.get_query_list(split, params)
 
     async def get_info(
         self,
@@ -757,9 +770,30 @@ if __name__ == "__main__":
         print(f"Failed to import and register environment {args.env}")
         sys.exit(1)
 
-    print(f"Starting server on {args.portal}:{args.port}")
+    print(f"Starting server on {args.portal}:{args.port}", flush=True)
+    print(
+        f"[env_service] Health check: http://{args.portal}:{args.port}/healthz",
+        flush=True,
+    )
+    print(
+        "[env_service] If nothing prints after Ray, the HTTP server is still starting; "
+        "or set ENV_SERVICE_RAY_DASHBOARD=0 if Ray/dashboard blocks.",
+        flush=True,
+    )
 
+    # Previously log_level='error' hid Uvicorn's "Application startup complete", which
+    # looked like a hang. Override with ENV_SERVICE_UVICORN_LOG=warning|error if desired.
+    _uv_log = os.environ.get("ENV_SERVICE_UVICORN_LOG", "info").strip().lower()
+    _access = os.environ.get("ENV_SERVICE_UVICORN_ACCESS_LOG", "0").strip().lower()
+    _access_log = _access in ("1", "true", "yes", "on")
     if args.debug:
-        uvicorn.run(app, host=args.portal, port=args.port)
-    else:
-        uvicorn.run(app, host=args.portal, port=args.port,log_level="error" )
+        _uv_log = "debug"
+        _access_log = True
+
+    uvicorn.run(
+        app,
+        host=args.portal,
+        port=args.port,
+        log_level=_uv_log,
+        access_log=_access_log,
+    )

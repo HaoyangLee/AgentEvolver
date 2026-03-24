@@ -1,0 +1,188 @@
+hydra:
+  searchpath:
+    - file://external/config_fallback
+    - file://config
+
+defaults:
+  - ppo_trainer
+  - agentevolver
+  - _self_
+
+# ---------------------------------------------------------------------------
+# NL2SQL Self-Questioning Example
+#
+# This config enables Self-Questioning on NL2SQL tasks.
+# Prerequisites:
+#   1. NL2SQL env service is running (see env_service/launch_script/nl2sql.sh)
+#   2. Environment variables NL2SQL_DATA_PATH, NL2SQL_DB_DIR, NL2SQL_DB_TYPE are set
+#   3. Environment profile is at cookbook/env_profiles/nl2sql.json
+# ---------------------------------------------------------------------------
+
+algorithm:
+  adv_estimator: grpo
+  use_kl_in_reward: false
+
+data:
+  train_batch_size: 16
+  max_prompt_length: 2048
+  max_response_length: 4096
+  filter_overlong_prompts: true
+  truncation: "error"
+  return_raw_chat: true
+
+actor_rollout_ref:
+  hybrid_engine: true
+  model:
+    path: Qwen/Qwen2.5-7B-Instruct
+    use_remove_padding: true
+    enable_gradient_checkpointing: true
+  rollout:
+    prompt_length: 4096
+    response_length: 4096
+    max_model_len: 8192
+    temperature: 0.7
+    log_prob_micro_batch_size_per_gpu: 1
+    tensor_model_parallel_size: 1
+    name: vllm
+    mode: async
+    gpu_memory_utilization: 0.6
+    n: 4
+    log_prob_max_token_len_per_gpu: 8192
+    multi_turn:
+      completion_callback: agentevolver.module.trainer.simple_completion_callback.SimpleCompletionCallback
+      enable: true
+      format: llama3_json
+      max_steps: 15
+      tool_config_path: ""
+    max_env_worker: 16
+    context_template: "linear"
+    max_env_len: 2048
+    sparse: true
+  actor:
+    optim:
+      lr: 1e-6
+    ppo_micro_batch_size_per_gpu: 1
+    ppo_mini_batch_size: 4
+    use_kl_loss: true
+    kl_loss_coef: 0.001
+    kl_loss_type: low_var_kl
+    entropy_coeff: 0
+    ppo_max_token_len_per_gpu: 8192
+    fsdp_config:
+      param_offload: false
+      optimizer_offload: false
+    loss_agg_mode: token-mean
+  ref:
+    log_prob_micro_batch_size_per_gpu: 1
+    fsdp_config:
+      param_offload: true
+    log_prob_max_token_len_per_gpu: 8192
+
+# ---------------------------------------------------------------------------
+# Environment Service
+# ---------------------------------------------------------------------------
+
+env_service:
+  env_type: "nl2sql"
+  # Must match Step 1 (NL2SQL_HOST:NL2SQL_PORT). Override, e.g.:
+  #   python main_xxx.py env_service.env_url=http://127.0.0.1:8081
+  env_url: "http://127.0.0.1:8080"
+
+# ---------------------------------------------------------------------------
+# Trainer
+# ---------------------------------------------------------------------------
+
+trainer:
+  n_gpus_per_node: 1
+  nnodes: 1
+  logger: ["console"]
+  project_name: "nl2sql_self_questioning"
+  experiment_name: "nl2sql_sq_grpo"
+  save_freq: 50
+  test_freq: 5
+  total_epochs: 20
+  val_before_train: true
+
+# ---------------------------------------------------------------------------
+# Thread pool
+# ---------------------------------------------------------------------------
+
+thread_pool:
+  max_workers: 8
+
+# ---------------------------------------------------------------------------
+# Task Manager (Self-Questioning)
+# ---------------------------------------------------------------------------
+
+task_manager:
+  # Persist explored tasks to disk; remove to regenerate each run
+  train_data_path: nl2sql_explored.train.json
+  val_data_path: nl2sql_explored.val.json
+
+  # LLM for exploration and summarization
+  llm_client: qwen-plus
+
+  # Optional: local path for tokenizer during standalone datagen only (see step2 script / docs)
+  # tokenizer_model_path: /path/to/local/Qwen2.5-0.5B-Instruct
+
+  # How many times to explore each seed task (each produces different trajectories)
+  n: 2
+
+  # Environment profile describing the NL2SQL domain
+  env_profile: cookbook/env_profiles/nl2sql.json
+
+  # Batch size for dynamic synthetic data (match train_batch_size)
+  bs: ${data.train_batch_size}
+
+  # Parallel exploration threads (matches DB concurrency; keep moderate)
+  num_explore_threads: ${thread_pool.max_workers}
+
+  # Data mixture strategy
+  mixture:
+    use_original_tasks: true
+    synthetic_data_ratio: 0.3    # 30% synthetic NL2SQL data mixed with originals
+    shuffle: true
+
+  # Grader / reward
+  grader:
+    original_grader: env         # original BIRD/Spider tasks: use env evaluator
+    synthetic_grader: llm        # synthetic tasks: LLM judges against reference SQL
+
+  # Exploration strategy
+  strategy: random
+  strategy_args:
+    max_explore_step: 20         # DB exploration converges faster than API envs
+    max_llm_retries: 6
+    env_url: ${env_service.env_url}
+    exploration_llm_temperature: 0.8
+    exploration_llm_top_p: 0.95
+    exploration_llm_top_k: 50
+
+# ---------------------------------------------------------------------------
+# Self-Navigating (disabled for initial experiments)
+# ---------------------------------------------------------------------------
+
+exp_manager:
+  val_rollout_mode: "woexp"
+  train_rollout_mode: "woexp"
+  rollout_ratio: 0.0
+  train_sample_mode: "alldiscard"
+  train_sample_keepratio: 1.0
+  experience_template: "\n\nSome Related Experience to help you to complete the task:<EXP>{}</EXP>\n\n"
+  init_exp_before_training: false
+  init_exp_only: false
+  summary_batch_size: 8
+  reme:
+    base_url: "http://127.0.0.1:8001"
+    workspace_id: "default"
+    enable_summarizer: false
+    enable_context_generator: false
+    retrieve_top_k: 3
+    updated_freq: 0
+
+# ---------------------------------------------------------------------------
+# Self-Attributing (disabled for initial experiments)
+# ---------------------------------------------------------------------------
+
+attribution_driven_credit_assignment:
+  enable: false

@@ -120,6 +120,11 @@ task_manager:
   val_data_path: tasks_explored.val.json
   # model used to explore the environment
   llm_client: qwen-plus
+  # Standalone synthetic datagen (`python -m agentevolver.module.task_manager`): HF path used only
+  # for `hf_tokenizer` + length checks. Exploration/summarization still uses `llm_client` (e.g. DashScope).
+  # Set to a **local** small Qwen-compatible tree (e.g. Qwen2.5-0.5B-Instruct) when you are not training
+  # and do not want to download `actor_rollout_ref.model.path` (often a large RL policy checkpoint).
+  tokenizer_model_path: null
 
   # repetition of exploration
   # 0 - stop exploration

@@ -25,9 +25,19 @@ def run_task_manager(config):
     from verl.utils.fs import copy_to_local
     from verl.utils.tokenizer import hf_tokenizer
     from agentevolver.client.env_client import EnvClient
-    print("loading model")
-    local_path = copy_to_local(config.actor_rollout_ref.model.path, use_shm=config.actor_rollout_ref.model.get('use_shm', False))  # ⭐ Copy the model to a local path
-    
+    # Tokenizer for context-length checks in TaskManager / adapters; NOT the exploration LLM
+    # (that is `task_manager.llm_client`, e.g. DashScope). Avoid pulling the full RL policy from HF
+    # during standalone Step-2 datagen by setting `task_manager.tokenizer_model_path` to a local small model.
+    tok_src = config.task_manager.get("tokenizer_model_path", None)
+    if tok_src is None or str(tok_src).strip() == "" or str(tok_src).strip().lower() in ("null", "none", "~"):
+        tokenizer_hf_path = config.actor_rollout_ref.model.path
+    else:
+        tokenizer_hf_path = tok_src
+    print(f"loading tokenizer from: {tokenizer_hf_path}")
+    local_path = copy_to_local(
+        tokenizer_hf_path,
+        use_shm=config.actor_rollout_ref.model.get("use_shm", False),
+    )
     llm_client = DashScopeClient(model_name=config.task_manager.llm_client)  # ⭐ Initialize the LLM client
     tokenizer = hf_tokenizer(local_path, trust_remote_code=True)  # ⭐ Initialize the tokenizer
 
@@ -53,7 +63,21 @@ def run_task_manager(config):
     )  # ⭐ Initialize the TaskManager
     print("loading seed tasks")
     env_client = EnvClient(config.env_service.env_url)  # ⭐ Initialize the environment client
-    seed_tasks = ta.load_tasks_from_environment(env_client, env_type=config.env_service.env_type, split="train")  # ⭐ Load seed tasks from the environment
+    import os as _os
+
+    _profile_params = None
+    _ms = _os.environ.get("NL2SQL_MAX_SEED_TASKS", "").strip()
+    if _ms:
+        try:
+            _profile_params = {"max_seed_tasks": int(_ms)}
+        except ValueError:
+            pass
+    seed_tasks = ta.load_tasks_from_environment(
+        env_client,
+        env_type=config.env_service.env_type,
+        split="train",
+        params=_profile_params,
+    )  # ⭐ Load seed tasks from the environment
     print("loaded, #seed_tasks: ", seed_tasks)
 
     print("generating synthetic tasks...")

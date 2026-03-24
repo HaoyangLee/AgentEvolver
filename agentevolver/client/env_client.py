@@ -65,13 +65,13 @@ class EnvClient:
         Returns:
             List[str]: A list of task IDs.
         """
-        payload: dict = {"env_type": env_type}  # ⭐ Initialize the payload with the environment type
+        req_params: dict = {"split": split}
         if params:
-            payload["params"] = params  # ⭐ Add additional parameters to the payload if provided
+            req_params.update(params)
         response = self._make_request(
-            endpoint="/get_env_profile", env_type=env_type, params={"split": split}
-        )  
-        logger.debug(f"get_env_profile split: {split}")
+            endpoint="/get_env_profile", env_type=env_type, params=req_params
+        )
+        logger.debug(f"get_env_profile split: {split} params: {req_params}")
         # ⭐ Make the request to the API endpoint
         return response["data"]  # ⭐ Return the list of task IDs from the response
 

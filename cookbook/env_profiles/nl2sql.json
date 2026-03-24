@@ -1,0 +1,60 @@
+{
+  "name": "DataAnalyst",
+  "background": "A data analyst who queries relational databases to answer business questions using SQL. Familiar with SELECT, JOIN, GROUP BY, HAVING, subqueries, CTEs, and window functions.",
+  "entities": [
+    {
+      "name": "Database Schema",
+      "description": "The structural definition of a relational database, including tables, columns, data types, primary keys, and foreign key relationships between tables.",
+      "attrs": {
+        "tables": "List of all tables in the database, each with a description of its purpose.",
+        "columns": "Column names, data types, and descriptions for each table.",
+        "primary_keys": "Primary key columns that uniquely identify rows in a table.",
+        "foreign_keys": "Foreign key relationships connecting columns across different tables.",
+        "value_examples": "Sample values for columns, useful for understanding data distribution and format."
+      },
+      "opts": [
+        {
+          "name": "get_table_metadata",
+          "description": "Retrieve full metadata (column names, types, primary keys, constraints) for a specific table."
+        },
+        {
+          "name": "get_sample_rows",
+          "description": "Fetch a few sample rows from a table to understand actual data content, formats, and distributions."
+        }
+      ]
+    },
+    {
+      "name": "SQL Query",
+      "description": "A structured query language statement used to retrieve, filter, aggregate, or join data from the database to answer analytical questions.",
+      "attrs": {
+        "syntax": "The SQL statement text, including clauses like SELECT, FROM, WHERE, JOIN, GROUP BY, HAVING, ORDER BY, LIMIT.",
+        "result_set": "The rows and columns returned by executing the query.",
+        "executability": "Whether the query is syntactically and semantically valid against the current database schema."
+      },
+      "opts": [
+        {
+          "name": "is_sql_executable",
+          "description": "Validate whether a SQL query can be executed without errors against the current database."
+        },
+        {
+          "name": "test_sql",
+          "description": "Execute a SQL query and return sample result rows to verify correctness."
+        }
+      ]
+    }
+  ],
+  "task_preference": {
+    "num_entities": 2,
+    "num_opts": 3,
+    "relation_difficulty": 3
+  },
+  "rubrics": [
+    "Each task must be a natural language question answerable by a single SQL SELECT query against the explored database.",
+    "The action_sequence field must contain a valid, executable SQL query (SELECT or WITH ... SELECT only).",
+    "Questions should sound like real analytical or business questions a human would ask, not technical SQL descriptions.",
+    "Include concrete values (names, dates, thresholds, counts) in the question to make it specific and verifiable.",
+    "Prefer tasks that require JOINs across multiple tables, GROUP BY aggregations, HAVING filters, or subqueries.",
+    "Do not generate tasks that modify data (INSERT, UPDATE, DELETE) or that are trivially answerable by SELECT * from a single table.",
+    "Ensure diversity: cover different tables, different query patterns (filtering, ranking, aggregation, comparison), and different difficulty levels."
+  ]
+}

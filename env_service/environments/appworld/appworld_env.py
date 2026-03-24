@@ -984,5 +984,5 @@ class AppworldEnv(BaseEnv):
         return observation
 
     @staticmethod
-    def get_query_list(split: str = "train"):
+    def get_query_list(split: str = "train", params: Dict = None):
         return load_task_ids(split)

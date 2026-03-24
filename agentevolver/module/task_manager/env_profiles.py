@@ -184,7 +184,8 @@ class EnvProfile:
                 "num_entities": self._task_preference.num_entities,
                 "num_opts": self._task_preference.num_opts,
                 "relation_difficulty": self._task_preference._relation_difficulty
-            }
+            },
+            "rubrics": list(self._rubrics),
         }
         return json.dumps(data, indent=2)  # ⭐ Converts the dictionary to a JSON string with an indentation of 2 spaces
 
@@ -238,6 +239,10 @@ class EnvProfile:
             entities.append(entity)
         
         env_profile.reg_entities(entities)  # ⭐ Register the entities with the user profile
+
+        for rubric in data.get("rubrics", []):
+            env_profile.reg_rubric(rubric)
+
         return env_profile
 
     @classmethod

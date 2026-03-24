@@ -132,7 +132,7 @@ venv/
 # Local resources and scripts
 /_resources
 /sync_*.sh
-/best_logger
+# /best_logger — vendored stub now lives in-repo as `best_logger/`
 launcher
 cradle.py
 Note

@@ -230,15 +230,24 @@ class TaskManager(object):
         parallel_num = min(self._num_exploration_threads, len(tasks))
         with ThreadPoolExecutor(max_workers=self._num_exploration_threads) as pool:
             batch_indices = list(range(0, len(task_q), parallel_num))
+            n_batches = len(batch_indices)
             for idx, i in enumerate(tqdm(batch_indices, desc="generating tasks", disable=not show_progress)):
                 # Skip already processed batches when resuming
                 if idx in processed_indices:
                     continue
 
+                batch_tasks = task_q[i : i + parallel_num]
+                logger.info(
+                    "generate_task batch {}/{}: exploring {} seed tasks in parallel (each up to {} env steps × LLM calls — first batch may take several minutes)",
+                    idx + 1,
+                    n_batches,
+                    len(batch_tasks),
+                    getattr(self._exploration_strategy, "_max_explore_step", "?"),
+                )
                 futures = [
                     pool.submit(self._exlore_and_summarize, task, data_id, rollout_id)
                     for task, data_id, rollout_id in zip(
-                        task_q[i : i + parallel_num],
+                        batch_tasks,
                         ["unknown"] * parallel_num,
                         ["unknown"] * parallel_num,
                     )
